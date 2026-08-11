@@ -65,52 +65,91 @@ trust that "it ran without errors" means it's correct.
 
 ## Phase 5. Custom Project
 
-Describe your custom project and how you made your modeling decisions.
-
-Be specific about what changed from the example project.
+My custom project serves a Titanic passenger survival classifier instead of
+the example's penguin species classifier - same publishing pattern (train,
+save, serve, validate), a different dataset, target, and one feature that
+needs encoding.
 
 ### Basis and Data
 
-Describe the dataset, input, or example you started with.
-
-Include:
-
-- The original example dataset or input
-- The data source
-- Why you chose it, kept it, or changed it
-- Any important limitations or assumptions
+- **The original example dataset:** Seaborn `penguins` (344 rows), predicting
+  the 3-class categorical `species` from four numeric bill/flipper/mass
+  measurements.
+- **My dataset:** Seaborn `titanic` (891 rows), loaded the same way with
+  `sns.load_dataset("titanic")`. I predict `survived` (0/1) from `pclass`,
+  `sex`, `age`, `sibsp`, `parch`, and `fare`.
+- **Why I chose it:** it's a well-known binary classification problem, small
+  enough to train instantly, and - unlike the example's all-numeric
+  features - it has a real categorical feature (`sex`) that has to be
+  encoded before it can reach the model, which exercises a part of the
+  serving contract the example never has to handle.
+- **Limitations/assumptions:** 177 of 891 rows are missing `age` and are
+  dropped (same drop-missing-required-columns approach the example uses),
+  leaving 714 modeling rows. I did not attempt to impute the missing ages,
+  which a more careful project would consider instead of discarding ~20% of
+  the data.
 
 ### Example Model and Serving Approach
 
-Describe the model being served and how it is deployed.
-
-Include:
-
-- What the model predicts and what inputs it expects
-- How the model was trained and saved
-- How the API receives a request and returns a prediction
-- Where the model is deployed (local, Render, Hugging Face, or other)
+- **What the model predicts:** the example's `RandomForestClassifier`
+  predicts penguin `species` from 4 numeric measurements and is served by
+  `serve_case.py`'s `/predict` endpoint, which returns `{"prediction": <species>}`.
+- **How it's trained/saved:** `model_builder_case.py` loads, splits,
+  trains, evaluates, and `joblib.dump()`s the model to `artifacts/model.joblib`.
+- **How the API serves it:** `serve_case.py` loads that artifact once at
+  import time, and `predict_from_features()` validates the incoming payload
+  (all 4 features present and numeric) before calling `model.predict()`.
 
 ### Custom Application
 
-Describe your custom dataset, model, or API changes.
-
-Include:
-
-- What you changed from the example (dataset, model, endpoint, or inputs)
-- Why you made those changes
-- How you verified that your custom model or API works correctly
+- **What I changed:** dataset (titanic vs. penguins), target (`survived`,
+  binary, vs. `species`, 3-class), feature set (6 columns including one
+  categorical), and the artifact path (`artifacts/model_teja.joblib` so it
+  never collides with the example's `artifacts/model.joblib`).
+- **Why:** to prove I can apply the same publish-a-model pattern to a
+  dataset and target I chose myself, and to deliberately hit a case
+  (categorical input) the example's numeric-only features don't cover -
+  the encoding has to match exactly between training
+  (`model_builder_teja.py`) and serving (`serve_teja.py`), or predictions
+  would be silently wrong.
+- **How I verified it:**
+    - `uv run python -m mlstudio.model_builder_teja` trains, evaluates, and
+      saves the artifact.
+    - `uv run python -m pytest` - `test_model_builder_teja.py` passes,
+      including an accuracy-floor check (> 0.70).
+    - `uv run python -m pyright` - 0 errors.
+    - Called `serve_teja.predict_from_features()` directly with a valid
+      payload, a payload missing a required feature, and a payload with an
+      unrecognized `sex` value - all three behaved as expected (a
+      prediction, and two clean `ValueError`s).
+    - Ran the full workflow in `notebooks/ml_06_teja.ipynb` (load → split →
+      train → save → reload → test the serving core → summarize).
 
 ### Summary
 
-Summarize your custom project.
+- **How I implemented it:** copied `model_builder_case.py` →
+  `model_builder_teja.py` and `serve_case.py` → `serve_teja.py`, swapped in
+  the Titanic dataset/target/features, added a `SEX_MAP` encoding step
+  shared conceptually (re-declared, not imported, matching the example's
+  existing pattern of duplicating constants across the builder and server)
+  between training and serving, and built `notebooks/ml_06_teja.ipynb` to
+  run and narrate the whole pipeline.
+- **Results:** the RandomForestClassifier reaches **76.9% test accuracy**
+  on 143 held-out passengers, well above the ~59% baseline of always
+  predicting "did not survive." `fare`, `age`, and `sex` were the three
+  most important features (see chart below) - `pclass`, `sibsp`, and
+  `parch` mattered less.
+- **What I learned:** keeping the serving core's validation in sync with
+  the training-time preprocessing is the real risk in this pattern - it's
+  easy to encode a categorical feature correctly during training and forget
+  to apply the identical encoding (and reject unrecognized values) at
+  serving time. Writing `predict_from_features()` to fail loudly with a
+  `ValueError` on an unrecognized `sex` value, instead of silently passing
+  a bad number to the model, was the main design decision I made beyond
+  copying the example.
+- **Real-world applications:** this is the same shape as any production
+  ML feature with a small fixed vocabulary (plan tier, region code, device
+  type, yes/no survey answers) - the pattern of encode-consistently and
+  validate-at-the-boundary generalizes directly.
 
-Include:
-
-- How you implemented your custom model or API
-- What results you got
-- What you learned
-- How well you exercised the skills covered in this project
-- What kinds of real problems you could apply these skills to in the future
-
-Display at least one image or screenshot showing your work.
+![Titanic survival model feature importance - fare, age, and sex are the top three drivers](./images/teja_feature_importance.png)

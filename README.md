@@ -68,6 +68,7 @@ See [docs/your-files.md](docs/your-files.md) for more.
 Links:
 
 - [ml_06_case.ipynb](notebooks/ml_06_case.ipynb)
+- [ml_06_teja.ipynb](notebooks/ml_06_teja.ipynb) - my custom Phase 5 notebook (Titanic survival)
 
 ## Working Files
 
@@ -122,6 +123,65 @@ near-perfect R-squared already said: on this small, clean, almost perfectly
 linear 10-row dataset, the model's predictions barely miss the actual scores.
 
 ![Predicted vs actual score, all points near the diagonal](./docs/images/pred_vs_actual_teja.png)
+
+## My Files (Phase 5)
+
+My custom project: a served model on a different dataset, target, and
+feature set, including one feature (`sex`) the example never has to
+deal with - a categorical column that must be encoded before it can be
+used by the model, both at training time and at serving time.
+
+| Example (unchanged)          | My copy                      |
+| ------------------------------ | ------------------------------ |
+| `src/mlstudio/model_builder_case.py` | `src/mlstudio/model_builder_teja.py` |
+| `src/mlstudio/serve_case.py`         | `src/mlstudio/serve_teja.py`         |
+| `tests/test_model_builder_case.py`   | `tests/test_model_builder_teja.py`   |
+| `notebooks/ml_06_serve_model.ipynb`  | `notebooks/ml_06_teja.ipynb`         |
+| `artifacts/model.joblib`             | `artifacts/model_teja.joblib`        |
+
+Run mine with:
+
+```shell
+uv run python -m mlstudio.model_builder_teja
+uv run fastapi dev src/mlstudio/serve_teja.py
+```
+
+**Dataset:** Seaborn `titanic` (891 passenger records).
+**Target:** `survived` (0 = did not survive, 1 = survived) - binary classification,
+in place of the example's 3-class penguin species.
+**Features:** `pclass`, `sex`, `age`, `sibsp`, `parch`, `fare`.
+
+**What I changed from the example:**
+
+- A different dataset, target, and feature set (Titanic survival vs.
+  penguin species).
+- `sex` arrives as the strings `"male"`/`"female"`, so `model_builder_teja.py`
+  encodes it to `0`/`1` before training, and `serve_teja.py` validates and
+  re-applies that same encoding on every incoming request - rejecting any
+  other value with a clean `ValueError` (HTTP 400) instead of crashing.
+- Rows with missing `age` (177 of 891) are dropped, the same
+  drop-missing-required-columns approach the example uses for penguins.
+- The response includes a human-readable `survived: true/false` alongside
+  the raw `0`/`1` prediction label.
+
+**Why:** Titanic survival is a well-known binary classification problem with
+a real categorical feature, so it exercises the parts of the serving
+contract - input validation, encoding consistency between training and
+serving - that the example's all-numeric penguin features never touch.
+
+**How I verified it worked:** ran `uv run python -m mlstudio.model_builder_teja`
+(trains, evaluates, and saves the artifact), `uv run python -m pytest`
+(`test_model_builder_teja.py` passes, including an accuracy check),
+`uv run python -m pyright` (0 errors), and exercised `serve_teja.predict_from_features()`
+directly with a valid payload, a payload missing a feature, and a payload with
+an invalid `sex` value - all three handled as expected. See
+`notebooks/ml_06_teja.ipynb` for the full executed run.
+
+**Result:** the RandomForestClassifier reaches **76.9% test accuracy**
+predicting survival on the held-out 143 test rows (well above the ~59%
+baseline of always predicting "did not survive"). A first-class passenger
+who is a 29-year-old woman paying a $100 fare is predicted to survive;
+missing features and unrecognized `sex` values are both rejected cleanly.
 
 ## Instructions (pro-analytics-02)
 
