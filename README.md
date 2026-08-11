@@ -80,6 +80,49 @@ You'll work with these areas:
 - **pyproject.toml** - update authorship & links
 - **zensical.toml** - update authorship & links
 
+## My Files (Phase 4)
+
+I copied the example module and made one small technical change to my copy.
+The example files are unchanged and still run.
+
+| Example (unchanged)       | My copy                   |
+| -------------------------- | -------------------------- |
+| `src/mlstudio/app_case.py` | `src/mlstudio/app_teja.py` |
+| `tests/test_app_case.py`   | `tests/test_app_teja.py`   |
+
+Run mine with:
+
+```shell
+uv run python -m mlstudio.app_teja
+```
+
+**What I changed:** the example only charts the raw data and the model
+coefficients, so there was no way to see how close the model's predictions
+land to the actual held-out scores. I added a third chart to `make_plots()`
+that plots predicted score vs actual score for the test rows, with a diagonal
+reference line, and saves it to `docs/images/pred_vs_actual_teja.png`.
+
+**Why:** points on the diagonal are perfect predictions; points off the line
+show over- or under-prediction at a glance. It turns the abstract MAE/R-squared
+numbers into a picture I can read in one look.
+
+**Bug I found and fixed along the way:** the first version of my chart plotted
+`sns.scatterplot(x=y_test, y=y_pred)` directly against the pandas Series
+returned by `train_test_split()`. That `y_test` keeps its original,
+non-sequential row index while `model.predict()`'s output gets a fresh
+`0, 1, 2` index, so seaborn silently aligned the two by index and dropped
+every row whose index didn't happen to match - only 1 of the 3 test points
+ever showed up. Converting `y_test` to a plain NumPy array before plotting
+fixed it.
+
+**Result:** on the 3 held-out test rows the model reports
+`MAE 0.48` and `R-squared 1.00`, and the corrected chart shows all 3 points
+sitting almost exactly on the diagonal line, confirming visually what the
+near-perfect R-squared already said: on this small, clean, almost perfectly
+linear 10-row dataset, the model's predictions barely miss the actual scores.
+
+![Predicted vs actual score, all points near the diagonal](./docs/images/pred_vs_actual_teja.png)
+
 ## Instructions (pro-analytics-02)
 
 Follow the
@@ -125,7 +168,7 @@ open a machine terminal in your `Repos` folder:
 
 ```shell
 # Replace username with YOUR GitHub username.
-git clone https://github.com/username/ml-06-serving
+git clone https://github.com/vnallam09/ml-06-serving
 
 cd ml-06-serving
 code .

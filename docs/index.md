@@ -30,19 +30,38 @@ to get the example projects running on your machine.
 
 ## Phase 4. Technical Modification
 
-Describe your small technical modification to the example project.
+I copied `src/mlstudio/app_case.py` to `src/mlstudio/app_teja.py`
+(with a matching `tests/test_app_teja.py`) and left the original example untouched.
 
-Include:
+- **What I changed:** the example's `make_plots()` only charts the raw data
+  and the model coefficients. I added a third chart: predicted score vs
+  actual score for the held-out test rows, with a diagonal reference line
+  marking where a perfect prediction would land, saved to
+  `docs/images/pred_vs_actual_teja.png`.
+- **Why I chose that change:** the example already logs MAE and R-squared,
+  but a single number doesn't show *where* a model over- or under-predicts.
+  Plotting predicted vs actual makes that visible immediately.
+- **How I verified it worked:** ran `uv run python -m pytest`
+  (both `test_app_case.py` and `test_app_teja.py` pass), `uv run python -m pyright`
+  (0 errors), and `uv run python -m mlstudio.app_teja`, confirming the script
+  still logs `Executed successfully!` and produces three charts instead of two.
+- **What result confirmed the change:** on the 3 held-out test rows the model
+  reports `MAE 0.48` and `R-squared 1.00`; the new chart shows all 3 points
+  sitting almost exactly on the diagonal line, which visually matches that
+  near-perfect R-squared.
 
-- What you changed
-- Why you chose that change
-- How you verified that it worked
-- What result, output, chart, metric, or behavior confirmed the change
-
-Compared with the example project,
-explain what is different and why the change matters.
-
-Was it easy, or surprisingly challenging and why do you think so?
+Compared with the example project, the workflow and every existing chart are
+identical - the only difference is the added predicted-vs-actual chart in my
+copy. The change itself was easy (it reuses the same `TEST_SIZE` and
+`RANDOM_STATE` constants to reproduce the exact test split from
+`train_model()`); the surprisingly challenging part was a bug I only found by
+actually looking at the rendered chart: plotting the raw pandas Series
+`x=y_test, y=y_pred` let seaborn align the two by index instead of by row
+position, and since `y_test` keeps the original non-sequential split index
+while `y_pred` gets a fresh `0, 1, 2` index, 2 of the 3 test points silently
+vanished from the plot. Converting `y_test` to a NumPy array before plotting
+fixed it - a good reminder to actually inspect a chart's output rather than
+trust that "it ran without errors" means it's correct.
 
 ## Phase 5. Custom Project
 
