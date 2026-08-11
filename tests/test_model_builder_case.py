@@ -125,7 +125,10 @@ def test_train_model_returns_classifier(model: RandomForestClassifier) -> None:
 
 def test_train_model_has_feature_names(model: RandomForestClassifier) -> None:
     """The fitted model knows its feature names."""
-    assert list(model.feature_names_in_) == FEATURE_COLS
+    # WHY ignore: sklearn sets feature_names_in_ dynamically during fit();
+    # it isn't declared on the RandomForestClassifier stub, so pyright
+    # doesn't know about it.
+    assert list(model.feature_names_in_) == FEATURE_COLS  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_train_model_classes(model: RandomForestClassifier) -> None:

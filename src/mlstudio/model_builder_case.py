@@ -26,7 +26,7 @@ OBS:
 
 import logging
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
 from datafun_toolkit.logger import get_logger, log_header
 import joblib
@@ -98,8 +98,10 @@ def split_data(
     of performance on new data.
     Stratifying preserves the class balance in both splits.
     """
-    X: pd.DataFrame = df_model[FEATURE_COLS]
-    y: pd.Series = df_model[TARGET_COL]
+    # WHY cast: pandas' __getitem__ overloads can't narrow a list[str]/str
+    # constant to DataFrame/Series, so pyright infers a wider union here.
+    X: pd.DataFrame = cast(pd.DataFrame, df_model[FEATURE_COLS])
+    y: pd.Series = cast(pd.Series, df_model[TARGET_COL])
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y
@@ -108,7 +110,12 @@ def split_data(
     LOG.info(f"Train instances: {len(X_train)}")
     LOG.info(f"Test instances:  {len(X_test)}")
 
-    return X_train, X_test, y_train, y_test
+    return (
+        cast(pd.DataFrame, X_train),
+        cast(pd.DataFrame, X_test),
+        cast(pd.Series, y_train),
+        cast(pd.Series, y_test),
+    )
 
 
 # === Section 4. Train the Model ===
